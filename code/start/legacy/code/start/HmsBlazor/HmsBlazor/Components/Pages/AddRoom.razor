@@ -1,7 +1,7 @@
 @page "/addroom"
-@using System.Data
+@using System.Net.Http.Json
+@inject HttpClient Http
 @inject NavigationManager Navigation
-@inject Project_HMS.DataAccess DataAccess
 @rendermode InteractiveServer
 
 <PageTitle>Add Room</PageTitle>
@@ -60,40 +60,31 @@
     private string txtRCost;
     private List<Room> rooms = new List<Room>();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        PopulateGridView();
-        AutoIdGenerate();
+        await PopulateGridView();
+        await AutoIdGenerate();
     }
 
-    private void PopulateGridView(string sql = "select * from Room;")
+    private async Task PopulateGridView()
     {
-        try
+        rooms = await Http.GetFromJsonAsync<List<Room>>("api/room");
+        @* try
         {
-            var ds = ExecuteQuery(sql);
-            rooms = ds.Tables[0].AsEnumerable().Select(row => new Room
-                {
-                    RId = row.Field<int>("RId"),
-                    Category = row.Field<string>("Category"),
-                    IsBooked = row.Field<string>("IsBooked"),
-                    RoomCost = row.Field<double>("RoomCost")
-                }).ToList();
+            rooms = await Http.GetFromJsonAsync<List<Room>>("api/room");
         }
         catch (Exception exc)
         {
             Console.WriteLine("Error: " + exc.Message);
-        }
+        } *@
     }
 
-    private void AutoIdGenerate()
+    private async Task AutoIdGenerate()
     {
         try
         {
-            string sql1 = "select RId from Room order by RId desc;";
-            var dt1 = DataAccess.ExecuteQueryTable(sql1);
-            string I = dt1.Rows[0]["RId"].ToString();
-            var ID = Convert.ToDouble(I);
-            txtRId = (ID + 1).ToString();
+            var lastRoom = rooms.OrderByDescending(r => r.RId).FirstOrDefault();
+            txtRId = (lastRoom?.RId + 1).ToString() ?? "1";
         }
         catch (Exception exc)
         {
@@ -116,7 +107,7 @@
         txtRCost = "";
     }
 
-    private void btnSave_Click()
+    private async Task btnSave_Click()
     {
         try
         {
@@ -126,40 +117,27 @@
                 return;
             }
 
-            var sql = $"select * from Room where RId = {txtRId};";
-            var ds = ExecuteQuery(sql);
-            if (ds.Tables[0].Rows.Count == 1)
+            var room = new Room
             {
-                // Update
-                string query = $"update Room set Category = '{txtCategory}', IsBooked = '{txtIsBooked}', RoomCost = {txtRCost} where RId = {txtRId};";
-                int count =  ExecuteDML(query);
-                if (count == 1)
-                {
-                    Console.WriteLine("Room Updated Successfully.");
-                }
-                else
-                {
-                    Console.WriteLine("Room Upgradation Failed.");
-                }
+                RId = int.Parse(txtRId),
+                Category = txtCategory,
+                IsBooked = txtIsBooked,
+                RoomCost = double.Parse(txtRCost)
+            };
+
+            var response = await Http.PostAsJsonAsync("api/room", room);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine("Room saved successfully.");
             }
             else
             {
-                // Insert
-                string query = $"insert into Room values ({txtRId}, '{txtCategory}', '{txtIsBooked}', {txtRCost}, NULL);";
-                int count = ExecuteDML(query);
-                if (count == 1)
-                {
-                    Console.WriteLine("Room Inserted.");
-                }
-                else
-                {
-                    Console.WriteLine("Room Insertion Failed.");
-                }
+                Console.WriteLine("Room save failed.");
             }
 
-            PopulateGridView();
+            await PopulateGridView();
             ClearContent();
-            AutoIdGenerate();
+            await AutoIdGenerate();
         }
         catch (Exception exc)
         {
@@ -172,54 +150,35 @@
         ClearContent();
     }
 
-    private void btnDelete_Click()
+    private async Task btnDelete_Click()
     {
         try
         {
             var id = rooms.FirstOrDefault(r => r.RId.ToString() == txtRId)?.RId.ToString();
             if (id != null)
             {
-                string sql = $"delete from Room where RId = '{id}';";
-                int count =  ExecuteDML(sql);
-                if (count == 1)
+                var response = await Http.DeleteAsync($"api/room/{id}");
+                if (response.IsSuccessStatusCode)
                 {
                     Console.WriteLine($"Room {id} has been deleted.");
                 }
                 else
                 {
-                    Console.WriteLine("Room Deletion Failed.");
+                    Console.WriteLine("Room deletion failed.");
                 }
 
-                PopulateGridView();
+                await PopulateGridView();
             }
         }
         catch (Exception exc)
         {
             Console.WriteLine("Error: " + exc.Message);
-            throw;
         }
     }
 
     private void btnBack_Click()
     {
         Navigation.NavigateTo("/");
-    }
-
-    private DataSet ExecuteQuery(string sql)
-    {
-        var ds = DataAccess.ExecuteQuery(sql);
-        return ds;
-    }
-
-    private DataTable ExecuteQueryTable(string sql)
-    {
-        var dt = DataAccess.ExecuteQueryTable(sql);
-        return dt;
-    }
-
-    private int ExecuteDML(string sql)
-    {
-        return DataAccess.ExecuteDML(sql);
     }
 
     public class Room
