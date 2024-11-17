@@ -1,0 +1,120 @@
+﻿@page "/billhistory" 
+@using Project_HMS 
+@using System.Data
+@inject NavigationManager Navigation
+@inject Project_HMS.DataAccess Da
+
+@code { private string BId { get; set; } private string RId { get; set; } private string CName { get; set; } private string Phone { get; set; } private DateTime CheckIn { get; set; } private DateTime CheckOut { get; set; } private string Advance { get; set; } private string Remaining { get; set; } private string Total { get; set; } private string NPaid { get; set; } private string Return { get; set; } private List<Booking> Bookings { get; set; } = new List<Booking>();
+
+protected override void OnInitialized()
+{
+    PopulateGridView();
+}
+
+private void PopulateGridView()
+{
+    try
+    {
+        string sql = "select * from Booking;";
+        DataSet ds1 = Da.ExecuteQuery(sql);
+        Bookings = ds1.Tables[0].AsEnumerable().Select(row => new Booking
+        {
+            BId = row["BId"].ToString(),
+            RId = row["RId"].ToString(),
+            CName = row["CName"].ToString(),
+            Phone = row["CPhone"].ToString(),
+            CheckIn = Convert.ToDateTime(row["CheckIn"]),
+            CheckOut = Convert.ToDateTime(row["CheckOut"]),
+            Advance = row["Advance"].ToString(),
+            Remaining = row["Remaining"].ToString(),
+            Total = row["Total"].ToString()
+        }).ToList();
+    }
+    catch (Exception exc)
+    {
+        Console.WriteLine("Error: " + exc.Message);
+    }
+}
+
+private void ClearContent()
+{
+    BId = string.Empty;
+    RId = string.Empty;
+    CName = string.Empty;
+    Phone = string.Empty;
+    CheckIn = DateTime.Now;
+    CheckOut = DateTime.Now;
+    Advance = string.Empty;
+    Remaining = string.Empty;
+    Total = string.Empty;
+    NPaid = string.Empty;
+    Return = string.Empty;
+}
+
+private void Calculate()
+{
+    try
+    {
+        double rv = 0;
+        var R = Convert.ToDouble(Remaining);
+        var N = Convert.ToDouble(NPaid);
+        rv = N - R;
+        Return = Convert.ToString(rv);
+    }
+    catch (Exception exc)
+    {
+        Console.WriteLine("Error: " + exc.Message);
+    }
+}
+
+private void Print()
+{
+    // Implement print logic here
+}
+
+private void Update()
+{
+    try
+    {
+        // Update In Room Table
+        string update = $"UPDATE Room SET IsBooked = 'No' WHERE RId = {RId}";
+        int count1 = Da.ExecuteDML(update);
+
+        if (count1 == 1)
+        {
+            Console.WriteLine("Data Updated In Room Table Successfully.");
+        }
+        else
+        {
+            Console.WriteLine("Data Upgradation Failed In Room Table.");
+        }
+
+        // Update In Booking Table
+        string update1 = $"UPDATE Booking SET Advance = {Total}, Remaining = 0 WHERE BId = {BId}";
+        int count2 = Da.ExecuteDML(update1);
+
+        if (count2 == 1)
+        {
+            Console.WriteLine("Data Updated In Booking Table Successfully.");
+            PopulateGridView();
+        }
+        else
+        {
+            Console.WriteLine("Data Upgradation Failed In Booking Table.");
+        }
+        ClearContent();
+    }
+    catch (Exception exc)
+    {
+        Console.WriteLine("Error: " + exc.Message);
+    }
+}
+
+private void NavigateBack()
+{
+    NavigationManager.NavigateTo("/managerdashboard");
+}
+}
+
+<div class="container"> <div class="row"> <div class="col-md-6"> <label>Bill ID</label> <input type="text" @bind="BId" class="form-control" readonly /> </div> <div class="col-md-6"> <label>Room ID</label> <input type="text" @bind="RId" class="form-control" /> </div> <div class="col-md-6"> <label>Customer Name</label> <input type="text" @bind="CName" class="form-control" /> </div> <div class="col-md-6"> <label>Phone</label> <input type="text" @bind="Phone" class="form-control" /> </div> <div class="col-md-6"> <label>Check In</label> <input type="date" @bind="CheckIn" class="form-control" /> </div> <div class="col-md-6"> <label>Check Out</label> <input type="date" @bind="CheckOut" class="form-control" /> </div> <div class="col-md-6"> <label>Advance</label> <input type="text" @bind="Advance" class="form-control" /> </div> <div class="col-md-6"> <label>Remaining</label> <input type="text" @bind="Remaining" class="form-control" /> </div> <div class="col-md-6"> <label>Total</label> <input type="text" @bind="Total" class="form-control" /> </div> <div class="col-md-6"> <label>Now Paid</label> <input type="text" @bind="NPaid" class="form-control" /> </div> <div class="col-md-6"> <label>Return</label> <input type="text" @bind="Return" class="form-control" readonly /> </div> </div> <div class="row mt-3"> <div class="col-md-12"> <button class="btn btn-primary" @onclick="Calculate">Calculate</button> <button class="btn btn-secondary" @onclick="ClearContent">Clear</button> <button class="btn btn-danger" @onclick="Update">Update</button> <button class="btn btn-info" @onclick="NavigateBack">Back</button> </div> </div> <div class="row mt-3"> <div class="col-md-12"> <table class="table table-bordered"> <thead> <tr> <th>Bill ID</th> <th>Room ID</th> <th>Customer Name</th> <th>Phone</th> <th>Check In</th> <th>Check Out</th> <th>Advance</th> <th>Remaining</th> <th>Total</th> </tr> </thead> <tbody> @foreach (var booking in Bookings) { <tr @onclick="() => { BId = booking.BId; RId = booking.RId; CName = booking.CName; Phone = booking.Phone; CheckIn = booking.CheckIn; CheckOut = booking.CheckOut; Advance = booking.Advance; Remaining = booking.Remaining; Total = booking.Total; }"> <td>@booking.BId</td> <td>@booking.RId</td> <td>@booking.CName</td> <td>@booking.Phone</td> <td>@booking.CheckIn.ToShortDateString()</td> <td>@booking.CheckOut.ToShortDateString()</td> <td>@booking.Advance</td> <td>@booking.Remaining</td> <td>@booking.Total</td> </tr> } </tbody> </table> </div> </div> </div>
+public class Booking { public string BId { get; set; } public string RId { get; set; } public string CName { get; set; } public string Phone { get; set; } public DateTime CheckIn { get; set; } public DateTime CheckOut { get; set; } public string Advance { get; set; } public string Remaining { get; set; } public string Total { get; set; } }
